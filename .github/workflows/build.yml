@@ -1,0 +1,726 @@
+name: Build PhotoFlow Wallpaper
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - '.github/workflows/build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35'
+          api-level: 35
+          build-tools: '35.0.0'
+
+      - name: Generate complete Android project
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE"
+          APP="$ROOT/app"
+          mkdir -p "$APP/src/main/java/com/photoflow/wallpaper"
+          mkdir -p "$APP/src/main/res/layout"
+          mkdir -p "$APP/src/main/res/xml"
+          mkdir -p "$APP/src/main/res/values"
+          mkdir -p "$APP/src/main/res/drawable"
+          mkdir -p "$APP/src/main/res/mipmap-anydpi-v26"
+
+          # ========== settings.gradle.kts ==========
+          cat > "$ROOT/settings.gradle.kts" << 'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "PhotoFlowWallpaper"
+          include(":app")
+          EOF
+
+          # ========== build.gradle.kts (root) ==========
+          cat > "$ROOT/build.gradle.kts" << 'EOF'
+          plugins {
+              id("com.android.application") version "8.7.3" apply false
+              id("org.jetbrains.kotlin.android") version "2.0.21" apply false
+          }
+          EOF
+
+          # ========== gradle.properties ==========
+          cat > "$ROOT/gradle.properties" << 'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          kotlin.code.style=official
+          android.nonTransitiveRClass=true
+          EOF
+
+          # ========== app/build.gradle.kts ==========
+          cat > "$APP/build.gradle.kts" << 'EOF'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+
+          android {
+              namespace = "com.photoflow.wallpaper"
+              compileSdk = 35
+
+              defaultConfig {
+                  applicationId = "com.photoflow.wallpaper"
+                  minSdk = 26
+                  targetSdk = 35
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+
+              buildTypes {
+                  release {
+                      isMinifyEnabled = false
+                  }
+              }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+              buildFeatures {
+                  viewBinding = true
+              }
+          }
+
+          dependencies {
+              implementation("androidx.core:core-ktx:1.15.0")
+              implementation("androidx.appcompat:appcompat:1.7.0")
+              implementation("com.google.android.material:material:1.12.0")
+              implementation("androidx.constraintlayout:constraintlayout:2.2.0")
+              implementation("androidx.recyclerview:recyclerview:1.3.2")
+              implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+              implementation("androidx.media3:media3-exoplayer:1.5.1")
+              implementation("androidx.media3:media3-ui:1.5.1")
+          }
+          EOF
+
+          # ========== AndroidManifest.xml ==========
+          cat > "$APP/src/main/AndroidManifest.xml" << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+              <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+              <uses-permission android:name="android.permission.INTERNET" />
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@mipmap/ic_launcher"
+                  android:label="PhotoFlow Wallpaper"
+                  android:supportsRtl="true"
+                  android:theme="@style/Theme.PhotoFlow">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+
+                  <receiver
+                      android:name=".PhotoWidgetProvider"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                      </intent-filter>
+                      <meta-data
+                          android:name="android.appwidget.provider"
+                          android:resource="@xml/photo_widget_info" />
+                  </receiver>
+
+                  <service
+                      android:name=".PhotoLiveWallpaperService"
+                      android:exported="true"
+                      android:permission="android.permission.BIND_WALLPAPER">
+                      <intent-filter>
+                          <action android:name="android.service.wallpaper.WallpaperService" />
+                      </intent-filter>
+                      <meta-data
+                          android:name="android.service.wallpaper"
+                          android:resource="@xml/wallpaper" />
+                  </service>
+
+                  <service
+                      android:name=".VideoLiveWallpaperService"
+                      android:exported="true"
+                      android:permission="android.permission.BIND_WALLPAPER">
+                      <intent-filter>
+                          <action android:name="android.service.wallpaper.WallpaperService" />
+                      </intent-filter>
+                      <meta-data
+                          android:name="android.service.wallpaper"
+                          android:resource="@xml/wallpaper_video" />
+                  </service>
+
+              </application>
+          </manifest>
+          EOF
+
+          # ========== xml/photo_widget_info.xml ==========
+          cat > "$APP/src/main/res/xml/photo_widget_info.xml" << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+              android:minWidth="180dp"
+              android:minHeight="180dp"
+              android:targetCellWidth="2"
+              android:targetCellHeight="2"
+              android:updatePeriodMillis="1800000"
+              android:initialLayout="@layout/widget_photo"
+              android:resizeMode="horizontal|vertical"
+              android:widgetCategory="home_screen" />
+          EOF
+
+          # ========== xml/wallpaper.xml ==========
+          cat > "$APP/src/main/res/xml/wallpaper.xml" << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
+              android:description="@string/wallpaper_desc"
+              android:thumbnail="@drawable/ic_launcher_foreground" />
+          EOF
+
+          # ========== xml/wallpaper_video.xml ==========
+          cat > "$APP/src/main/res/xml/wallpaper_video.xml" << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
+              android:description="@string/wallpaper_video_desc"
+              android:thumbnail="@drawable/ic_launcher_foreground" />
+          EOF
+
+          # ========== layout/activity_main.xml ==========
+          cat > "$APP/src/main/res/layout/activity_main.xml" << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:background="#121212"
+              android:padding="20dp">
+
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:orientation="vertical">
+
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="PhotoFlow Wallpaper"
+                      android:textColor="#FFFFFF"
+                      android:textSize="26sp"
+                      android:textStyle="bold" />
+
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="8dp"
+                      android:text="ফটো ও ভিডিও লাইভ ওয়ালপেপার"
+                      android:textColor="#AAAAAA"
+                      android:textSize="14sp" />
+
+                  <com.google.android.material.button.MaterialButton
+                      android:id="@+id/btnPickPhotos"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="24dp"
+                      android:text="ছবি নির্বাচন করুন (Widget/Live)"
+                      android:textAllCaps="false" />
+
+                  <com.google.android.material.button.MaterialButton
+                      android:id="@+id/btnPickVideo"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="12dp"
+                      android:text="ভিডিও নির্বাচন করুন (Video Live)"
+                      android:textAllCaps="false" />
+
+                  <com.google.android.material.button.MaterialButton
+                      android:id="@+id/btnSetPhotoWallpaper"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="12dp"
+                      android:text="ফটো লাইভ ওয়ালপেপার সেট করুন"
+                      android:textAllCaps="false" />
+
+                  <com.google.android.material.button.MaterialButton
+                      android:id="@+id/btnSetVideoWallpaper"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="12dp"
+                      android:text="ভিডিও লাইভ ওয়ালপেপার সেট করুন"
+                      android:textAllCaps="false" />
+
+                  <TextView
+                      android:id="@+id/tvStatus"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="20dp"
+                      android:text="প্রস্তুত"
+                      android:textColor="#80CBC4"
+                      android:textSize="13sp" />
+              </LinearLayout>
+          </ScrollView>
+          EOF
+
+          # ========== layout/widget_photo.xml ==========
+          cat > "$APP/src/main/res/layout/widget_photo.xml" << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:background="#1E1E1E">
+
+              <ImageView
+                  android:id="@+id/widgetImage"
+                  android:layout_width="match_parent"
+                  android:layout_height="match_parent"
+                  android:scaleType="centerCrop"
+                  android:contentDescription="Photo" />
+
+              <TextView
+                  android:id="@+id/widgetEmpty"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_gravity="center"
+                  android:text="ছবি যোগ করুন"
+                  android:textColor="#888888"
+                  android:textSize="14sp" />
+          </FrameLayout>
+          EOF
+
+          # ========== values/strings.xml ==========
+          cat > "$APP/src/main/res/values/strings.xml" << 'EOF'
+          <resources>
+              <string name="app_name">PhotoFlow Wallpaper</string>
+              <string name="wallpaper_desc">ফটো ফ্লো লাইভ ওয়ালপেপার</string>
+              <string name="wallpaper_video_desc">ভিডিও লাইভ ওয়ালপেপার</string>
+          </resources>
+          EOF
+
+          # ========== values/themes.xml ==========
+          cat > "$APP/src/main/res/values/themes.xml" << 'EOF'
+          <resources>
+              <style name="Theme.PhotoFlow" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+                  <item name="colorPrimary">#80CBC4</item>
+                  <item name="colorPrimaryVariant">#4DB6AC</item>
+                  <item name="colorOnPrimary">#000000</item>
+                  <item name="android:statusBarColor">#121212</item>
+                  <item name="android:navigationBarColor">#121212</item>
+                  <item name="android:windowBackground">#121212</item>
+              </style>
+          </resources>
+          EOF
+
+          # ========== drawable/ic_launcher_foreground.xml ==========
+          cat > "$APP/src/main/res/drawable/ic_launcher_foreground.xml" << 'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+              <path
+                  android:fillColor="#80CBC4"
+                  android:pathData="M54,30 C40,30 30,40 30,54 C30,68 40,78 54,78 C68,78 78,68 78,54 C78,40 68,30 54,30 Z M54,44 C59.5,44 64,48.5 64,54 C64,59.5 59.5,64 54,64 C48.5,64 44,59.5 44,54 C44,48.5 48.5,44 54,44 Z" />
+          </vector>
+          EOF
+
+          # ========== mipmap-anydpi-v26/ic_launcher.xml ==========
+          cat > "$APP/src/main/res/mipmap-anydpi-v26/ic_launcher.xml" << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/ic_launcher_background" />
+              <foreground android:drawable="@drawable/ic_launcher_foreground" />
+          </adaptive-icon>
+          EOF
+
+          # ========== values/colors.xml ==========
+          cat > "$APP/src/main/res/values/colors.xml" << 'EOF'
+          <resources>
+              <color name="ic_launcher_background">#121212</color>
+          </resources>
+          EOF
+
+          # ========== MainActivity.kt ==========
+          cat > "$APP/src/main/java/com/photoflow/wallpaper/MainActivity.kt" << 'EOF'
+          package com.photoflow.wallpaper
+
+          import android.app.Activity
+          import android.app.WallpaperManager
+          import android.content.ComponentName
+          import android.content.Intent
+          import android.net.Uri
+          import android.os.Bundle
+          import android.widget.Button
+          import android.widget.TextView
+          import android.widget.Toast
+          import androidx.activity.result.contract.ActivityResultContracts
+          import androidx.appcompat.app.AppCompatActivity
+          import com.google.android.material.button.MaterialButton
+
+          class MainActivity : AppCompatActivity() {
+
+              private lateinit var tvStatus: TextView
+              private var pendingAction: String? = null
+
+              private val pickPhotos = registerForActivityResult(
+                  ActivityResultContracts.OpenMultipleDocuments()
+              ) { uris: List<Uri> ->
+                  if (uris.isNotEmpty()) {
+                      val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                      uris.forEach { uri ->
+                          contentResolver.takePersistableUriPermission(uri, takeFlags)
+                      }
+                      val prefs = getSharedPreferences("photoflow", MODE_PRIVATE)
+                      val existing = prefs.getStringSet("photo_uris", emptySet()) ?: emptySet()
+                      val merged = existing + uris.map { it.toString() }
+                      prefs.edit().putStringSet("photo_uris", merged).apply()
+                      tvStatus.text = "নির্বাচিত ছবি: ${merged.size}"
+                      Toast.makeText(this, "${uris.size} টি ছবি যোগ হয়েছে", Toast.LENGTH_SHORT).show()
+                  }
+              }
+
+              private val pickVideo = registerForActivityResult(
+                  ActivityResultContracts.OpenDocument()
+              ) { uri: Uri? ->
+                  uri?.let {
+                      contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                      val prefs = getSharedPreferences("photoflow", MODE_PRIVATE)
+                      prefs.edit().putString("video_uri", it.toString()).apply()
+                      tvStatus.text = "ভিডিও নির্বাচিত হয়েছে"
+                  }
+              }
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  setContentView(R.layout.activity_main)
+                  tvStatus = findViewById(R.id.tvStatus)
+
+                  findViewById<MaterialButton>(R.id.btnPickPhotos).setOnClickListener {
+                      pickPhotos.launch(arrayOf("image/*"))
+                  }
+
+                  findViewById<MaterialButton>(R.id.btnPickVideo).setOnClickListener {
+                      pickVideo.launch(arrayOf("video/*"))
+                  }
+
+                  findViewById<MaterialButton>(R.id.btnSetPhotoWallpaper).setOnClickListener {
+                      val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)
+                      intent.putExtra(
+                          WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                          ComponentName(this, PhotoLiveWallpaperService::class.java)
+                      )
+                      startActivity(intent)
+                  }
+
+                  findViewById<MaterialButton>(R.id.btnSetVideoWallpaper).setOnClickListener {
+                      val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)
+                      intent.putExtra(
+                          WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                          ComponentName(this, VideoLiveWallpaperService::class.java)
+                      )
+                      startActivity(intent)
+                  }
+
+                  val prefs = getSharedPreferences("photoflow", MODE_PRIVATE)
+                  val count = prefs.getStringSet("photo_uris", emptySet())?.size ?: 0
+                  tvStatus.text = "সংরক্ষিত ছবি: $count"
+              }
+          }
+          EOF
+
+          # ========== PhotoWidgetProvider.kt ==========
+          cat > "$APP/src/main/java/com/photoflow/wallpaper/PhotoWidgetProvider.kt" << 'EOF'
+          package com.photoflow.wallpaper
+
+          import android.appwidget.AppWidgetManager
+          import android.appwidget.AppWidgetProvider
+          import android.content.Context
+          import android.graphics.Bitmap
+          import android.graphics.BitmapFactory
+          import android.net.Uri
+          import android.widget.RemoteViews
+          import java.io.InputStream
+
+          class PhotoWidgetProvider : AppWidgetProvider() {
+
+              override fun onUpdate(
+                  context: Context,
+                  appWidgetManager: AppWidgetManager,
+                  appWidgetIds: IntArray
+              ) {
+                  val prefs = context.getSharedPreferences("photoflow", Context.MODE_PRIVATE)
+                  val uris = prefs.getStringSet("photo_uris", emptySet())?.toList() ?: emptyList()
+
+                  for (appWidgetId in appWidgetIds) {
+                      val views = RemoteViews(context.packageName, R.layout.widget_photo)
+                      if (uris.isNotEmpty()) {
+                          val index = prefs.getInt("widget_index_$appWidgetId", 0) % uris.size
+                          val uri = Uri.parse(uris[index])
+                          try {
+                              val input: InputStream? = context.contentResolver.openInputStream(uri)
+                              val bitmap = BitmapFactory.decodeStream(input)
+                              input?.close()
+                              if (bitmap != null) {
+                                  views.setImageViewBitmap(R.id.widgetImage, bitmap)
+                                  views.setViewVisibility(R.id.widgetEmpty, android.view.View.GONE)
+                              } else {
+                                  views.setViewVisibility(R.id.widgetEmpty, android.view.View.VISIBLE)
+                              }
+                          } catch (e: Exception) {
+                              views.setViewVisibility(R.id.widgetEmpty, android.view.View.VISIBLE)
+                          }
+                          prefs.edit().putInt("widget_index_$appWidgetId", index + 1).apply()
+                      } else {
+                          views.setViewVisibility(R.id.widgetEmpty, android.view.View.VISIBLE)
+                          views.setViewVisibility(R.id.widgetImage, android.view.View.GONE)
+                      }
+                      appWidgetManager.updateAppWidget(appWidgetId, views)
+                  }
+              }
+          }
+          EOF
+
+          # ========== PhotoLiveWallpaperService.kt ==========
+          cat > "$APP/src/main/java/com/photoflow/wallpaper/PhotoLiveWallpaperService.kt" << 'EOF'
+          package com.photoflow.wallpaper
+
+          import android.graphics.Bitmap
+          import android.graphics.BitmapFactory
+          import android.graphics.Canvas
+          import android.graphics.Color
+          import android.graphics.Paint
+          import android.graphics.Rect
+          import android.net.Uri
+          import android.os.Handler
+          import android.os.Looper
+          import android.service.wallpaper.WallpaperService
+          import android.view.SurfaceHolder
+
+          class PhotoLiveWallpaperService : WallpaperService() {
+
+              override fun onCreateEngine(): Engine = PhotoEngine()
+
+              inner class PhotoEngine : Engine() {
+                  private val handler = Handler(Looper.getMainLooper())
+                  private var visible = false
+                  private var currentIndex = 0
+                  private var currentBitmap: Bitmap? = null
+                  private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+                  private val runnable = object : Runnable {
+                      override fun run() {
+                          if (!visible) return
+                          loadNext()
+                          handler.postDelayed(this, 30_000L)
+                      }
+                  }
+
+                  override fun onVisibilityChanged(visible: Boolean) {
+                      this.visible = visible
+                      if (visible) {
+                          loadNext()
+                          handler.postDelayed(runnable, 30_000L)
+                      } else {
+                          handler.removeCallbacks(runnable)
+                      }
+                  }
+
+                  override fun onSurfaceDestroyed(holder: SurfaceHolder) {
+                      super.onSurfaceDestroyed(holder)
+                      handler.removeCallbacks(runnable)
+                      currentBitmap?.recycle()
+                      currentBitmap = null
+                  }
+
+                  private fun loadNext() {
+                      val prefs = getSharedPreferences("photoflow", MODE_PRIVATE)
+                      val uris = prefs.getStringSet("photo_uris", emptySet())?.toList() ?: return
+                      if (uris.isEmpty()) {
+                          drawPlaceholder()
+                          return
+                      }
+                      currentIndex = (currentIndex + 1) % uris.size
+                      val uri = Uri.parse(uris[currentIndex])
+                      try {
+                          val input = contentResolver.openInputStream(uri)
+                          val options = BitmapFactory.Options().apply {
+                              inJustDecodeBounds = true
+                          }
+                          BitmapFactory.decodeStream(input, null, options)
+                          input?.close()
+                          options.inSampleSize = calculateSampleSize(options)
+                          options.inJustDecodeBounds = false
+                          val input2 = contentResolver.openInputStream(uri)
+                          val bitmap = BitmapFactory.decodeStream(input2, null, options)
+                          input2?.close()
+                          currentBitmap?.recycle()
+                          currentBitmap = bitmap
+                          draw()
+                      } catch (e: Exception) {
+                          drawPlaceholder()
+                      }
+                  }
+
+                  private fun calculateSampleSize(options: BitmapFactory.Options): Int {
+                      val maxDim = 2048
+                      var sample = 1
+                      while (options.outWidth / sample > maxDim || options.outHeight / sample > maxDim) {
+                          sample *= 2
+                      }
+                      return sample
+                  }
+
+                  private fun draw() {
+                      val holder = surfaceHolder
+                      var canvas: Canvas? = null
+                      try {
+                          canvas = holder.lockCanvas()
+                          canvas?.drawColor(Color.BLACK)
+                          currentBitmap?.let { bmp ->
+                              val rect = Rect(0, 0, canvas!!.width, canvas!!.height)
+                              canvas.drawBitmap(bmp, null, rect, paint)
+                          }
+                      } finally {
+                          canvas?.let { holder.unlockCanvasAndPost(it) }
+                      }
+                  }
+
+                  private fun drawPlaceholder() {
+                      val holder = surfaceHolder
+                      var canvas: Canvas? = null
+                      try {
+                          canvas = holder.lockCanvas()
+                          canvas?.drawColor(Color.parseColor("#1E1E1E"))
+                      } finally {
+                          canvas?.let { holder.unlockCanvasAndPost(it) }
+                      }
+                  }
+              }
+          }
+          EOF
+
+          # ========== VideoLiveWallpaperService.kt ==========
+          cat > "$APP/src/main/java/com/photoflow/wallpaper/VideoLiveWallpaperService.kt" << 'EOF'
+          package com.photoflow.wallpaper
+
+          import android.net.Uri
+          import android.os.Handler
+          import android.os.Looper
+          import android.service.wallpaper.WallpaperService
+          import android.view.SurfaceHolder
+          import androidx.media3.common.MediaItem
+          import androidx.media3.common.Player
+          import androidx.media3.exoplayer.ExoPlayer
+
+          class VideoLiveWallpaperService : WallpaperService() {
+
+              override fun onCreateEngine(): Engine = VideoEngine()
+
+              inner class VideoEngine : Engine() {
+                  private var player: ExoPlayer? = null
+                  private var visible = false
+                  private val handler = Handler(Looper.getMainLooper())
+
+                  override fun onSurfaceCreated(holder: SurfaceHolder) {
+                      super.onSurfaceCreated(holder)
+                      player = ExoPlayer.Builder(this@VideoLiveWallpaperService).build().apply {
+                          val prefs = getSharedPreferences("photoflow", MODE_PRIVATE)
+                          val videoUri = prefs.getString("video_uri", null)
+                          if (videoUri != null) {
+                              setMediaItem(MediaItem.fromUri(Uri.parse(videoUri)))
+                              repeatMode = Player.REPEAT_MODE_ONE
+                              volume = if (prefs.getBoolean("video_sound", false)) 1f else 0f
+                              prepare()
+                          }
+                          setVideoSurfaceHolder(holder)
+                      }
+                  }
+
+                  override fun onVisibilityChanged(visible: Boolean) {
+                      this.visible = visible
+                      if (visible) {
+                          player?.playWhenReady = true
+                      } else {
+                          player?.playWhenReady = false
+                      }
+                  }
+
+                  override fun onSurfaceDestroyed(holder: SurfaceHolder) {
+                      super.onSurfaceDestroyed(holder)
+                      player?.release()
+                      player = null
+                  }
+              }
+          }
+          EOF
+
+          # ========== README.md ==========
+          cat > "$ROOT/README.md" << 'EOF'
+          # PhotoFlow Wallpaper
+
+          একক GitHub Actions ওয়ার্কফ্লো থেকে জেনারেট এবং বিল্ড করা Android অ্যাপ্লিকেশন।
+
+          ## সীমাবদ্ধতা
+          - AppWidget updatePeriodMillis-এর সর্বনিম্ন মান Android দ্বারা সীমাবদ্ধ (সাধারণত ৩০ মিনিট), তাই ১০ সেকেন্ডের নির্ভুল রিফ্রেশ গ্যারান্টি নেই।
+          - RemoteViews-এ জটিল অ্যানিমেশন (Blur, Zoom) সমর্থিত নয়; Fade/Crossfade-এর মতো মৌলিক পরিবর্তন সম্ভব।
+          - Live Wallpaper-এ সাউন্ড সব ডিভাইসে এবং সব launcher-এ কাজ নাও করতে পারে।
+          - ভিডিও লাইভ ওয়ালপেপার ExoPlayer ব্যবহার করে; ডিভাইস কোডেক সমর্থন সাপেক্ষে চলে।
+          EOF
+
+          echo "=== All project files generated ==="
+          find "$ROOT" -name "*.kts" -o -name "*.kt" -o -name "*.xml" | head -30
+
+      - name: Bootstrap Gradle Wrapper
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          gradle wrapper --gradle-version 8.9 --distribution-type bin || true
+          if [ ! -f "./gradlew" ]; then
+            echo "Gradle wrapper not found. Using system gradle."
+            gradle assembleDebug --no-daemon
+          else
+            chmod +x ./gradlew
+            ./gradlew assembleDebug --no-daemon
+          fi
+
+      - name: Upload Debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhotoFlow-Wallpaper-Debug-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
