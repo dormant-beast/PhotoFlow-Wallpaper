@@ -1,0 +1,722 @@
+name: Build PhotoFlow Wallpaper
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - '.github/workflows/build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35'
+          api-level: 35
+          build-tools: '35.0.0'
+
+      - name: Generate PhotoFlow Android project
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE"
+          APP="$ROOT/app"
+          PKG="$APP/src/main/java/com/photoflow/wallpaper"
+          RES="$APP/src/main/res"
+          mkdir -p "$PKG" "$RES/xml" "$RES/layout" "$RES/values" "$RES/drawable" "$RES/mipmap-anydpi-v26"
+
+          cat > "$ROOT/settings.gradle.kts" <<'EOF'
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "PhotoFlowWallpaper"
+          include(":app")
+          EOF
+
+          cat > "$ROOT/build.gradle.kts" <<'EOF'
+          plugins {
+              id("com.android.application") version "8.7.3" apply false
+              id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+          }
+          EOF
+
+          cat > "$ROOT/gradle.properties" <<'EOF'
+          org.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          kotlin.code.style=official
+          android.nonTransitiveRClass=true
+          EOF
+
+          cat > "$APP/build.gradle.kts" <<'EOF'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+          android {
+              namespace = "com.photoflow.wallpaper"
+              compileSdk = 35
+              defaultConfig {
+                  applicationId = "com.photoflow.wallpaper"
+                  minSdk = 26
+                  targetSdk = 35
+                  versionCode = 2
+                  versionName = "2.0"
+              }
+              buildTypes { release { isMinifyEnabled = false } }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions { jvmTarget = "17" }
+          }
+          dependencies {
+              implementation("androidx.core:core-ktx:1.13.1")
+              implementation("androidx.appcompat:appcompat:1.7.0")
+              implementation("com.google.android.material:material:1.12.0")
+              implementation("androidx.activity:activity-ktx:1.9.2")
+              implementation("androidx.media3:media3-exoplayer:1.4.1")
+          }
+          EOF
+
+          cat > "$APP/src/main/AndroidManifest.xml" <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+              <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+              <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+              <application
+                  android:allowBackup="true"
+                  android:icon="@mipmap/ic_launcher"
+                  android:label="@string/app_name"
+                  android:supportsRtl="true"
+                  android:theme="@style/Theme.PhotoFlow">
+                  <activity android:name=".MainActivity" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+                  <receiver android:name=".PhotoWidgetProvider" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                          <action android:name="com.photoflow.wallpaper.ACTION_NEXT_IMAGE" />
+                      </intent-filter>
+                      <meta-data android:name="android.appwidget.provider" android:resource="@xml/photo_widget_info" />
+                  </receiver>
+                  <service android:name=".PhotoLiveWallpaperService"
+                      android:exported="true" android:permission="android.permission.BIND_WALLPAPER">
+                      <intent-filter><action android:name="android.service.wallpaper.WallpaperService" /></intent-filter>
+                      <meta-data android:name="android.service.wallpaper" android:resource="@xml/wallpaper" />
+                  </service>
+                  <service android:name=".VideoLiveWallpaperService"
+                      android:exported="true" android:permission="android.permission.BIND_WALLPAPER">
+                      <intent-filter><action android:name="android.service.wallpaper.WallpaperService" /></intent-filter>
+                      <meta-data android:name="android.service.wallpaper" android:resource="@xml/wallpaper_video" />
+                  </service>
+              </application>
+          </manifest>
+          EOF
+
+          cat > "$RES/values/strings.xml" <<'EOF'
+          <resources>
+              <string name="app_name">PhotoFlow Wallpaper</string>
+              <string name="wallpaper_desc">PhotoFlow photo slideshow live wallpaper</string>
+              <string name="wallpaper_video_desc">PhotoFlow video live wallpaper</string>
+          </resources>
+          EOF
+
+          cat > "$RES/values/colors.xml" <<'EOF'
+          <resources>
+              <color name="ic_launcher_background">#090B16</color>
+          </resources>
+          EOF
+
+          cat > "$RES/values/themes.xml" <<'EOF'
+          <resources>
+              <style name="Theme.PhotoFlow" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+                  <item name="colorPrimary">#9B8CFF</item>
+                  <item name="colorPrimaryVariant">#6D5DFB</item>
+                  <item name="colorOnPrimary">#FFFFFF</item>
+                  <item name="android:statusBarColor">#090B16</item>
+                  <item name="android:navigationBarColor">#090B16</item>
+                  <item name="android:windowLightStatusBar">false</item>
+                  <item name="android:windowBackground">#090B16</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > "$RES/drawable/ic_launcher_foreground.xml" <<'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+              <path android:fillColor="#9B8CFF" android:pathData="M20,28 Q20,20 28,20 L80,20 Q88,20 88,28 L88,80 Q88,88 80,88 L28,88 Q20,88 20,80 Z"/>
+              <path android:fillColor="#090B16" android:pathData="M30,35 L78,35 L78,73 L30,73 Z"/>
+              <path android:fillColor="#4DE4D0" android:pathData="M35,65 L46,50 L55,59 L64,44 L75,65 Z"/>
+              <path android:fillColor="#FFFFFF" android:pathData="M38,42 A5,5 0,1 0,48 42 A5,5 0,1 0,38 42"/>
+          </vector>
+          EOF
+
+          cat > "$RES/mipmap-anydpi-v26/ic_launcher.xml" <<'EOF'
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/ic_launcher_background"/>
+              <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+          </adaptive-icon>
+          EOF
+
+          cat > "$RES/xml/photo_widget_info.xml" <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+              android:minWidth="110dp" android:minHeight="110dp"
+              android:minResizeWidth="80dp" android:minResizeHeight="80dp"
+              android:targetCellWidth="2" android:targetCellHeight="2"
+              android:maxResizeWidth="500dp" android:maxResizeHeight="500dp"
+              android:updatePeriodMillis="0" android:initialLayout="@layout/widget_photo"
+              android:resizeMode="horizontal|vertical" android:widgetCategory="home_screen"/>
+          EOF
+
+          cat > "$RES/xml/wallpaper.xml" <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
+              android:description="@string/wallpaper_desc" android:thumbnail="@drawable/ic_launcher_foreground"/>
+          EOF
+
+          cat > "$RES/xml/wallpaper_video.xml" <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
+              android:description="@string/wallpaper_video_desc" android:thumbnail="@drawable/ic_launcher_foreground"/>
+          EOF
+
+          cat > "$RES/drawable/widget_bg.xml" <<'EOF'
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <gradient android:startColor="#25233D" android:endColor="#111526" android:angle="135"/>
+              <corners android:radius="18dp"/>
+              <stroke android:width="1dp" android:color="#9B8CFF"/>
+          </shape>
+          EOF
+
+          cat > "$RES/layout/widget_photo.xml" <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:id="@+id/widgetRoot" android:layout_width="match_parent"
+              android:layout_height="match_parent" android:background="@drawable/widget_bg"
+              android:padding="2dp">
+              <ImageView android:id="@+id/widgetImage" android:layout_width="match_parent"
+                  android:layout_height="match_parent" android:scaleType="centerCrop"/>
+              <TextView android:id="@+id/widgetEmpty" android:layout_width="wrap_content"
+                  android:layout_height="wrap_content" android:layout_gravity="center"
+                  android:text="＋ Add photos" android:textColor="#FFFFFF"
+                  android:textSize="14sp" android:textStyle="bold"/>
+              <TextView android:id="@+id/widgetNext" android:layout_width="36dp"
+                  android:layout_height="36dp" android:layout_gravity="bottom|end"
+                  android:gravity="center" android:background="#99090B16"
+                  android:text="↻" android:textColor="#FFFFFF" android:textSize="20sp"/>
+          </FrameLayout>
+          EOF
+
+          cat > "$PKG/Prefs.kt" <<'EOF'
+          package com.photoflow.wallpaper
+
+          import android.content.Context
+          import android.net.Uri
+
+          object Prefs {
+              private const val FILE = "photoflow"
+              fun prefs(context: Context) = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+              // Backward-compatible with v1, which stored photo_uris as a StringSet.
+              // Also reads newline-separated strings from intermediate builds.
+              fun photos(context: Context): List<String> {
+                  val stored = prefs(context).all["photo_uris"]
+                  return when (stored) {
+                      is Set<*> -> stored.filterIsInstance<String>().filter { it.isNotBlank() }
+                      is String -> stored.split("\\n").filter { it.isNotBlank() }
+                      else -> emptyList()
+                  }.distinct()
+              }
+              fun savePhotos(context: Context, values: List<String>) {
+                  prefs(context).edit()
+                      .putStringSet("photo_uris", values.filter { it.isNotBlank() }.distinct().toSet())
+                      .apply()
+              }
+              fun uri(context: Context, key: String): Uri? =
+                  prefs(context).getString(key, null)?.let { runCatching { Uri.parse(it) }.getOrNull() }
+              fun interval(context: Context) = prefs(context).getLong("widget_interval", 60_000L).coerceAtLeast(15_000L)
+              fun nextIndex(context: Context, current: Int, size: Int): Int {
+                  if (size <= 1) return 0
+                  val p = prefs(context)
+                  return if (p.getBoolean("shuffle", false)) {
+                      var n = (0 until size).random()
+                      if (n == current) n = (n + 1) % size
+                      n
+                  } else (current + 1) % size
+              }
+          }
+          EOF
+
+          cat > "$PKG/MainActivity.kt" <<'EOF'
+          package com.photoflow.wallpaper
+
+          import android.app.WallpaperManager
+          import android.appwidget.AppWidgetManager
+          import android.content.ComponentName
+          import android.content.Intent
+          import android.graphics.Color
+          import android.graphics.Typeface
+          import android.graphics.drawable.GradientDrawable
+          import android.net.Uri
+          import android.os.Bundle
+          import android.view.Gravity
+          import android.view.View
+          import android.widget.*
+          import androidx.activity.result.contract.ActivityResultContracts
+          import androidx.appcompat.app.AppCompatActivity
+          import com.google.android.material.button.MaterialButton
+
+          class MainActivity : AppCompatActivity() {
+              private val p by lazy { Prefs.prefs(this) }
+              private lateinit var status: TextView
+              private lateinit var timer: Spinner
+              private lateinit var custom: LinearLayout
+              private lateinit var hours: EditText
+              private lateinit var minutes: EditText
+              private lateinit var seconds: EditText
+              private val labels = listOf("5 sec","10 sec","15 sec","30 sec","45 sec","1 min","2 min","3 min","5 min","10 min","15 min","30 min","1 hour","Custom")
+              private val values = listOf(5000L,10000L,15000L,30000L,45000L,60000L,120000L,180000L,300000L,600000L,900000L,1800000L,3600000L,-1L)
+
+              private val pickPhotos = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+                  if (!uris.isNullOrEmpty()) {
+                      val accepted = uris.mapNotNull { u ->
+                          runCatching {
+                              contentResolver.takePersistableUriPermission(u, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                              u.toString()
+                          }.getOrNull()
+                      }
+                      Prefs.savePhotos(this, (Prefs.photos(this) + accepted).distinct())
+                      updateWidgets()
+                      refreshStatus()
+                  }
+              }
+              private val pickVideo = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+                  uri?.let {
+                      runCatching { contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+                      p.edit().putString("video_uri", it.toString()).apply()
+                      refreshStatus()
+                  }
+              }
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  window.statusBarColor = Color.rgb(9,11,22)
+                  window.navigationBarColor = Color.rgb(9,11,22)
+                  buildUi()
+                  refreshStatus()
+              }
+
+              private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+              private fun panel(): LinearLayout = LinearLayout(this).apply {
+                  orientation = LinearLayout.VERTICAL
+                  setPadding(dp(16), dp(16), dp(16), dp(16))
+                  background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                      intArrayOf(Color.rgb(37,35,61), Color.rgb(17,21,38))).apply {
+                      cornerRadius = dp(22).toFloat()
+                      setStroke(dp(1), Color.rgb(92,83,145))
+                  }
+              }
+              private fun text(value: String, size: Float, color: Int = Color.WHITE, bold: Boolean = false) =
+                  TextView(this).apply {
+                      text = value; textSize = size; setTextColor(color)
+                      if (bold) typeface = Typeface.create("sans-serif", Typeface.BOLD)
+                  }
+              private fun button(label: String, action: () -> Unit) = MaterialButton(this).apply {
+                  text = label; isAllCaps = false; cornerRadius = dp(16)
+                  setBackgroundColor(Color.rgb(109,93,251))
+                  setTextColor(Color.WHITE); setOnClickListener { action() }
+              }
+              private fun buildUi() {
+                  val scroll = ScrollView(this).apply { setBackgroundColor(Color.rgb(9,11,22)) }
+                  val root = LinearLayout(this).apply {
+                      orientation = LinearLayout.VERTICAL
+                      setPadding(dp(18), dp(24), dp(18), dp(28))
+                  }
+                  scroll.addView(root)
+                  setContentView(scroll)
+
+                  root.addView(text("PHOTOFLOW", 13f, Color.rgb(77,228,208), true))
+                  root.addView(text("Wallpaper Studio", 30f, Color.WHITE, true))
+                  root.addView(text("Your moments. Your screen. Your flow.", 14f, Color.rgb(190,190,216)))
+                  val hero = panel()
+                  hero.addView(text("✦  PERSONAL WALLPAPER SPACE", 12f, Color.rgb(77,228,208), true))
+                  hero.addView(text("Turn your favourite memories into a living display.", 17f, Color.WHITE, true).apply {
+                      setPadding(0, dp(10), 0, dp(4))
+                  })
+                  hero.addView(text("Photos • Video • Slideshow • Custom timing", 12f, Color.rgb(190,190,216)))
+                  root.addView(hero, marginParams(top = 20))
+
+                  val media = panel()
+                  media.addView(text("01  ·  YOUR MEDIA", 13f, Color.rgb(77,228,208), true))
+                  media.addView(button("＋  Select photos", { pickPhotos.launch(arrayOf("image/*")) }), marginParams(top = 12))
+                  media.addView(button("▶  Select live wallpaper video", { pickVideo.launch(arrayOf("video/*")) }), marginParams(top = 8))
+                  root.addView(media, marginParams(top = 14))
+
+                  val slideshow = panel()
+                  slideshow.addView(text("02  ·  SLIDESHOW SETTINGS", 13f, Color.rgb(77,228,208), true))
+                  slideshow.addView(text("Change interval", 14f).apply { setPadding(0, dp(12), 0, dp(4)) })
+                  timer = Spinner(this).apply {
+                      adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, labels)
+                      setSelection(labels.indexOf("1 min"))
+                  }
+                  slideshow.addView(timer)
+                  custom = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; visibility = View.GONE }
+                  hours = edit("Hours"); minutes = edit("Minutes"); seconds = edit("Seconds")
+                  custom.addView(hours, LinearLayout.LayoutParams(0, dp(52), 1f))
+                  custom.addView(minutes, LinearLayout.LayoutParams(0, dp(52), 1f))
+                  custom.addView(seconds, LinearLayout.LayoutParams(0, dp(52), 1f))
+                  slideshow.addView(custom, marginParams(top = 8))
+                  timer.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                      override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                          custom.visibility = if (position == labels.lastIndex) View.VISIBLE else View.GONE
+                      }
+                      override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+                  }
+                  val shuffle = Switch(this).apply {
+                      text = "Shuffle photos"; setTextColor(Color.WHITE); isChecked = p.getBoolean("shuffle", false)
+                      setOnCheckedChangeListener { _, checked -> p.edit().putBoolean("shuffle", checked).apply() }
+                  }
+                  slideshow.addView(shuffle, marginParams(top = 8))
+                  val sound = Switch(this).apply {
+                      text = "Video sound"; setTextColor(Color.WHITE); isChecked = p.getBoolean("video_sound", false)
+                      setOnCheckedChangeListener { _, checked -> p.edit().putBoolean("video_sound", checked).apply() }
+                  }
+                  slideshow.addView(sound, marginParams(top = 2))
+                  val fit = Spinner(this).apply {
+                      adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("Crop to fill", "Fit inside"))
+                      setSelection(if (p.getBoolean("fit_inside", false)) 1 else 0)
+                      onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                          override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                              p.edit().putBoolean("fit_inside", position == 1).apply()
+                          }
+                          override fun onNothingSelected(parent: AdapterView<*>?) {}
+                      }
+                  }
+                  slideshow.addView(text("Image scaling", 14f).apply { setPadding(0, dp(10), 0, dp(4)) })
+                  slideshow.addView(fit)
+                  slideshow.addView(button("Save settings & refresh widget", { saveTimer() }), marginParams(top = 12))
+                  root.addView(slideshow, marginParams(top = 14))
+
+                  val live = panel()
+                  live.addView(text("03  ·  LIVE WALLPAPER", 13f, Color.rgb(77,228,208), true))
+                  live.addView(button("▧  Preview / set photo wallpaper", { setWallpaper(PhotoLiveWallpaperService::class.java) }), marginParams(top = 12))
+                  live.addView(button("▶  Preview / set video wallpaper", { setWallpaper(VideoLiveWallpaperService::class.java) }), marginParams(top = 8))
+                  root.addView(live, marginParams(top = 14))
+
+                  status = text("", 13f, Color.rgb(190,190,216))
+                  root.addView(status, marginParams(top = 18))
+                  root.addView(text("Note: Android launchers may delay frequent widget updates to save battery. Live wallpaper timing is more responsive while visible.", 11f, Color.rgb(145,148,176)).apply {
+                      setPadding(dp(2), dp(10), dp(2), 0)
+                  })
+              }
+              private fun edit(hintText: String) = EditText(this).apply {
+                  hint = hintText; setHintTextColor(Color.rgb(145,148,176)); setTextColor(Color.WHITE)
+                  inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                  setPadding(dp(8), 0, dp(4), 0)
+              }
+              private fun marginParams(top: Int = 0) = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(top) }
+              private fun saveTimer() {
+                  var ms = values[timer.selectedItemPosition]
+                  if (ms == -1L) {
+                      val h = hours.text.toString().toLongOrNull() ?: 0L
+                      val m = minutes.text.toString().toLongOrNull() ?: 0L
+                      val s = seconds.text.toString().toLongOrNull() ?: 0L
+                      if (h < 0 || m < 0 || s < 0 || h > 8760 || m > 59 || s > 59) {
+                          Toast.makeText(this, "Enter a valid custom time.", Toast.LENGTH_SHORT).show(); return
+                      }
+                      ms = (h * 3600 + m * 60 + s) * 1000
+                  }
+                  if (ms < 15000L) {
+                      Toast.makeText(this, "Widget interval minimum is 15 seconds; Android may still delay updates.", Toast.LENGTH_LONG).show()
+                      ms = 15000L
+                  }
+                  p.edit().putLong("widget_interval", ms).apply()
+                  updateWidgets()
+                  Toast.makeText(this, "Settings saved", Toast.LENGTH_SHORT).show()
+                  refreshStatus()
+              }
+              private fun updateWidgets() {
+                  val mgr = AppWidgetManager.getInstance(this)
+                  val ids = mgr.getAppWidgetIds(ComponentName(this, PhotoWidgetProvider::class.java))
+                  val intent = Intent(this, PhotoWidgetProvider::class.java).apply {
+                      action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                      putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+                  }
+                  sendBroadcast(intent)
+              }
+              private fun setWallpaper(clazz: Class<*>) {
+                  startActivity(Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
+                      putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, ComponentName(this@MainActivity, clazz))
+                  })
+              }
+              private fun refreshStatus() {
+                  if (!::status.isInitialized) return
+                  val photoCount = Prefs.photos(this).size
+                  val video = p.getString("video_uri", null) != null
+                  status.text = "Library: $photoCount photos  •  Video: ${if (video) "selected" else "not selected"}"
+              }
+          }
+          EOF
+
+          cat > "$PKG/PhotoWidgetProvider.kt" <<'EOF'
+          package com.photoflow.wallpaper
+
+          import android.app.AlarmManager
+          import android.app.PendingIntent
+          import android.appwidget.AppWidgetManager
+          import android.appwidget.AppWidgetProvider
+          import android.content.ComponentName
+          import android.content.Context
+          import android.content.Intent
+          import android.graphics.BitmapFactory
+          import android.net.Uri
+          import android.os.Build
+          import android.widget.RemoteViews
+
+          class PhotoWidgetProvider : AppWidgetProvider() {
+              companion object { const val ACTION_NEXT = "com.photoflow.wallpaper.ACTION_NEXT_IMAGE"; private const val REQUEST = 405 }
+              override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
+                  ids.forEach { updateOne(context, manager, it, false) }
+                  schedule(context)
+              }
+              override fun onReceive(context: Context, intent: Intent) {
+                  super.onReceive(context, intent)
+                  if (intent.action == ACTION_NEXT) {
+                      val manager = AppWidgetManager.getInstance(context)
+                      val ids = manager.getAppWidgetIds(ComponentName(context, PhotoWidgetProvider::class.java))
+                      ids.forEach { updateOne(context, manager, it, true) }
+                      schedule(context)
+                  }
+              }
+              private fun updateOne(context: Context, manager: AppWidgetManager, id: Int, advance: Boolean) {
+                  val views = RemoteViews(context.packageName, R.layout.widget_photo)
+                  val photos = Prefs.photos(context)
+                  val p = Prefs.prefs(context)
+                  var index = p.getInt("widget_index_$id", 0)
+                  if (photos.isNotEmpty()) {
+                      if (advance) index = Prefs.nextIndex(context, index, photos.size)
+                      index = index.coerceIn(0, photos.lastIndex)
+                      val bitmap = runCatching {
+                          context.contentResolver.openInputStream(Uri.parse(photos[index]))?.use { input ->
+                              val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                              BitmapFactory.decodeStream(input, null, opts)
+                              opts.inSampleSize = maxOf(1, maxOf(opts.outWidth / 900, opts.outHeight / 900))
+                              opts.inJustDecodeBounds = false
+                              context.contentResolver.openInputStream(Uri.parse(photos[index]))?.use { BitmapFactory.decodeStream(it, null, opts) }
+                          }
+                      }.getOrNull()
+                      if (bitmap != null) {
+                          views.setImageViewBitmap(R.id.widgetImage, bitmap)
+                          views.setViewVisibility(R.id.widgetEmpty, android.view.View.GONE)
+                          p.edit().putInt("widget_index_$id", index).apply()
+                      } else views.setViewVisibility(R.id.widgetEmpty, android.view.View.VISIBLE)
+                  } else views.setViewVisibility(R.id.widgetEmpty, android.view.View.VISIBLE)
+                  val next = Intent(context, PhotoWidgetProvider::class.java).apply { action = ACTION_NEXT }
+                  val pi = PendingIntent.getBroadcast(context, id + 7000, next, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                  views.setOnClickPendingIntent(R.id.widgetNext, pi)
+                  views.setOnClickPendingIntent(R.id.widgetImage, pi)
+                  views.setOnClickPendingIntent(R.id.widgetEmpty, pi)
+                  manager.updateAppWidget(id, views)
+              }
+              private fun schedule(context: Context) {
+                  val manager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                  val interval = Prefs.interval(context)
+                  val intent = Intent(context, PhotoWidgetProvider::class.java).apply { action = ACTION_NEXT }
+                  val pi = PendingIntent.getBroadcast(context, REQUEST, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                  manager.cancel(pi)
+                  val trigger = System.currentTimeMillis() + interval
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !manager.canScheduleExactAlarms()) {
+                      manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pi)
+                  } else {
+                      runCatching { manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pi) }
+                          .onFailure { manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pi) }
+                  }
+              }
+          }
+          EOF
+
+          cat > "$PKG/PhotoLiveWallpaperService.kt" <<'EOF'
+          package com.photoflow.wallpaper
+
+          import android.graphics.Bitmap
+          import android.graphics.BitmapFactory
+          import android.graphics.Canvas
+          import android.graphics.Color
+          import android.graphics.Paint
+          import android.graphics.Rect
+          import android.net.Uri
+          import android.os.Handler
+          import android.os.Looper
+          import android.service.wallpaper.WallpaperService
+          import android.view.SurfaceHolder
+
+          class PhotoLiveWallpaperService : WallpaperService() {
+              override fun onCreateEngine(): Engine = PhotoEngine()
+              inner class PhotoEngine : Engine() {
+                  private val handler = Handler(Looper.getMainLooper())
+                  private var visible = false
+                  private var index = -1
+                  private var bitmap: Bitmap? = null
+                  private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+                  private val cycle = object : Runnable {
+                      override fun run() {
+                          if (!visible) return
+                          loadNext()
+                          handler.postDelayed(this, Prefs.interval(this@PhotoLiveWallpaperService))
+                      }
+                  }
+                  override fun onVisibilityChanged(isVisible: Boolean) {
+                      visible = isVisible
+                      handler.removeCallbacks(cycle)
+                      if (visible) { if (bitmap == null) loadNext() else drawFrame(); handler.postDelayed(cycle, Prefs.interval(this@PhotoLiveWallpaperService)) }
+                  }
+                  override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+                      super.onSurfaceChanged(holder, format, width, height)
+                      drawFrame()
+                  }
+                  override fun onSurfaceDestroyed(holder: SurfaceHolder) {
+                      visible = false; handler.removeCallbacks(cycle)
+                      super.onSurfaceDestroyed(holder)
+                  }
+                  override fun onDestroy() {
+                      handler.removeCallbacks(cycle)
+                      bitmap?.recycle(); bitmap = null
+                      super.onDestroy()
+                  }
+                  private fun loadNext() {
+                      val photos = Prefs.photos(this@PhotoLiveWallpaperService)
+                      if (photos.isEmpty()) { drawFrame(); return }
+                      index = Prefs.nextIndex(this@PhotoLiveWallpaperService, index, photos.size)
+                      bitmap?.recycle()
+                      bitmap = runCatching {
+                          val uri = Uri.parse(photos[index])
+                          val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                          contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+                          opts.inSampleSize = maxOf(1, maxOf(opts.outWidth / 1400, opts.outHeight / 1400))
+                          opts.inJustDecodeBounds = false
+                          contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+                      }.getOrNull()
+                      drawFrame()
+                  }
+                  private fun drawFrame() {
+                      var canvas: Canvas? = null
+                      try {
+                          canvas = surfaceHolder.lockCanvas()
+                          if (canvas != null) {
+                              canvas.drawColor(Color.BLACK)
+                              val b = bitmap
+                              if (b != null) {
+                                  val dst = if (Prefs.prefs(this@PhotoLiveWallpaperService).getBoolean("fit_inside", false)) {
+                                      val scale = minOf(canvas.width.toFloat()/b.width, canvas.height.toFloat()/b.height)
+                                      val w = (b.width*scale).toInt(); val h = (b.height*scale).toInt()
+                                      Rect((canvas.width-w)/2, (canvas.height-h)/2, (canvas.width+w)/2, (canvas.height+h)/2)
+                                  } else {
+                                      val scale = maxOf(canvas.width.toFloat()/b.width, canvas.height.toFloat()/b.height)
+                                      val w = (b.width*scale).toInt(); val h = (b.height*scale).toInt()
+                                      Rect((canvas.width-w)/2, (canvas.height-h)/2, (canvas.width+w)/2, (canvas.height+h)/2)
+                                  }
+                                  canvas.drawBitmap(b, null, dst, paint)
+                              }
+                          }
+                      } catch (_: Exception) {
+                      } finally { if (canvas != null) runCatching { surfaceHolder.unlockCanvasAndPost(canvas) } }
+                  }
+              }
+          }
+          EOF
+
+          cat > "$PKG/VideoLiveWallpaperService.kt" <<'EOF'
+          package com.photoflow.wallpaper
+
+          import android.net.Uri
+          import android.service.wallpaper.WallpaperService
+          import android.view.SurfaceHolder
+          import androidx.media3.common.MediaItem
+          import androidx.media3.common.Player
+          import androidx.media3.exoplayer.ExoPlayer
+
+          class VideoLiveWallpaperService : WallpaperService() {
+              override fun onCreateEngine(): Engine = VideoEngine()
+              inner class VideoEngine : Engine() {
+                  private var player: ExoPlayer? = null
+                  private var visible = false
+                  override fun onSurfaceCreated(holder: SurfaceHolder) {
+                      super.onSurfaceCreated(holder)
+                      releasePlayer()
+                      val raw = Prefs.prefs(this@VideoLiveWallpaperService).getString("video_uri", null) ?: return
+                      player = runCatching {
+                          ExoPlayer.Builder(this@VideoLiveWallpaperService).build().apply {
+                              setMediaItem(MediaItem.fromUri(Uri.parse(raw)))
+                              repeatMode = Player.REPEAT_MODE_ONE
+                              volume = if (Prefs.prefs(this@VideoLiveWallpaperService).getBoolean("video_sound", false)) 1f else 0f
+                              setVideoSurfaceHolder(holder)
+                              prepare()
+                              playWhenReady = visible
+                          }
+                      }.getOrNull()
+                  }
+                  override fun onVisibilityChanged(isVisible: Boolean) {
+                      visible = isVisible
+                      player?.playWhenReady = isVisible
+                  }
+                  override fun onSurfaceDestroyed(holder: SurfaceHolder) {
+                      releasePlayer()
+                      super.onSurfaceDestroyed(holder)
+                  }
+                  override fun onDestroy() {
+                      releasePlayer()
+                      super.onDestroy()
+                  }
+                  private fun releasePlayer() {
+                      val old = player
+                      player = null
+                      if (old != null) runCatching { old.clearVideoSurface(); old.release() }
+                  }
+              }
+          }
+          EOF
+
+          echo "PhotoFlow project generated."
+
+      - name: Bootstrap Gradle Wrapper
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          gradle wrapper --gradle-version 8.9 --distribution-type bin
+          chmod +x ./gradlew
+
+      - name: Build debug APK
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhotoFlow-Wallpaper-v2-Debug-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
