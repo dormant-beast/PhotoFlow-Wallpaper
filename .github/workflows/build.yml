@@ -108,8 +108,10 @@ jobs:
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
               }
-              kotlinOptions {
-                  jvmTarget = "17"
+              kotlin {
+                  compilerOptions {
+                      jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+                  }
               }
               buildFeatures {
                   viewBinding = true
@@ -487,7 +489,6 @@ jobs:
           cat > "$APP/src/main/java/com/photoflow/wallpaper/MainActivity.kt" << 'EOF'
           package com.photoflow.wallpaper
 
-          import android.app.Activity
           import android.app.WallpaperManager
           import android.appwidget.AppWidgetManager
           import android.content.ComponentName
@@ -705,7 +706,6 @@ jobs:
           import android.graphics.BitmapFactory
           import android.net.Uri
           import android.os.Build
-          import android.os.Bundle
           import android.widget.RemoteViews
           import java.io.InputStream
 
@@ -1021,7 +1021,7 @@ jobs:
             echo "Gradle wrapper not found. Using system gradle."
             gradle assembleDebug --no-daemon
           else
-            chmod +x ./gradlew
+            chmod + ./gradlew
             ./gradlew assembleDebug --no-daemon
           fi
 
