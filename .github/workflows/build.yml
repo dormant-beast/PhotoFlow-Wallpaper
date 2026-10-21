@@ -135,7 +135,8 @@ jobs:
 
               <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
               <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
               <application
                   android:allowBackup="true"
@@ -158,6 +159,7 @@ jobs:
                       android:exported="true">
                       <intent-filter>
                           <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                          <action android:name="com.photoflow.wallpaper.ACTION_NEXT_IMAGE" />
                       </intent-filter>
                       <meta-data
                           android:name="android.appwidget.provider"
@@ -196,11 +198,15 @@ jobs:
           cat > "$APP/src/main/res/xml/photo_widget_info.xml" << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-              android:minWidth="180dp"
-              android:minHeight="180dp"
+              android:minWidth="110dp"
+              android:minHeight="110dp"
+              android:minResizeWidth="110dp"
+              android:minResizeHeight="110dp"
               android:targetCellWidth="2"
               android:targetCellHeight="2"
-              android:updatePeriodMillis="1800000"
+              android:maxResizeWidth="500dp"
+              android:maxResizeHeight="500dp"
+              android:updatePeriodMillis="0"
               android:initialLayout="@layout/widget_photo"
               android:resizeMode="horizontal|vertical"
               android:widgetCategory="home_screen" />
@@ -248,7 +254,7 @@ jobs:
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
                       android:layout_marginTop="8dp"
-                      android:text="ফটো ও ভিডিও লাইভ ওয়ালপেপার"
+                      android:text="Photo &amp; Video Live Wallpaper"
                       android:textColor="#AAAAAA"
                       android:textSize="14sp" />
 
@@ -257,7 +263,7 @@ jobs:
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
                       android:layout_marginTop="24dp"
-                      android:text="ছবি নির্বাচন করুন (Widget/Live)"
+                      android:text="Select Photos (Widget/Live)"
                       android:textAllCaps="false" />
 
                   <com.google.android.material.button.MaterialButton
@@ -265,15 +271,107 @@ jobs:
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
                       android:layout_marginTop="12dp"
-                      android:text="ভিডিও নির্বাচন করুন (Video Live)"
+                      android:text="Select Video (Video Live)"
                       android:textAllCaps="false" />
+
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="24dp"
+                      android:text="Widget Timer Settings"
+                      android:textColor="#80CBC4"
+                      android:textSize="18sp"
+                      android:textStyle="bold" />
+
+                  <Spinner
+                      android:id="@+id/spinnerInterval"
+                      android:layout_width="match_parent"
+                      android:layout_height="50dp"
+                      android:layout_marginTop="8dp"
+                      android:background="#1E1E1E"
+                      android:padding="10dp" />
+
+                  <LinearLayout
+                      android:id="@+id/customTimeLayout"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="8dp"
+                      android:orientation="horizontal"
+                      android:visibility="gone"
+                      android:weightSum="3">
+
+                      <EditText
+                          android:id="@+id/etHours"
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_weight="1"
+                          android:hint="Hrs"
+                          android:inputType="number"
+                          android:textColor="#FFFFFF"
+                          android:textColorHint="#888888" />
+
+                      <EditText
+                          android:id="@+id/etMinutes"
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_weight="1"
+                          android:hint="Min"
+                          android:inputType="number"
+                          android:textColor="#FFFFFF"
+                          android:textColorHint="#888888" />
+
+                      <EditText
+                          android:id="@+id/etSeconds"
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_weight="1"
+                          android:hint="Sec"
+                          android:inputType="number"
+                          android:textColor="#FFFFFF"
+                          android:textColorHint="#888888" />
+                  </LinearLayout>
+
+                  <com.google.android.material.button.MaterialButton
+                      android:id="@+id/btnSaveTimer"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="8dp"
+                      android:text="Save Timer &amp; Update Widget"
+                      android:textAllCaps="false"
+                      android:backgroundTint="#4DB6AC" />
+
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="24dp"
+                      android:text="Widget Appearance &amp; Scaling"
+                      android:textColor="#80CBC4"
+                      android:textSize="18sp"
+                      android:textStyle="bold" />
+
+                  <Spinner
+                      android:id="@+id/spinnerScaling"
+                      android:layout_width="match_parent"
+                      android:layout_height="50dp"
+                      android:layout_marginTop="8dp"
+                      android:background="#1E1E1E"
+                      android:padding="10dp" />
+
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginTop="24dp"
+                      android:text="Set Wallpapers"
+                      android:textColor="#80CBC4"
+                      android:textSize="18sp"
+                      android:textStyle="bold" />
 
                   <com.google.android.material.button.MaterialButton
                       android:id="@+id/btnSetPhotoWallpaper"
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:layout_marginTop="12dp"
-                      android:text="ফটো লাইভ ওয়ালপেপার সেট করুন"
+                      android:layout_marginTop="8dp"
+                      android:text="Set Photo Live Wallpaper"
                       android:textAllCaps="false" />
 
                   <com.google.android.material.button.MaterialButton
@@ -281,7 +379,7 @@ jobs:
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
                       android:layout_marginTop="12dp"
-                      android:text="ভিডিও লাইভ ওয়ালপেপার সেট করুন"
+                      android:text="Set Video Live Wallpaper"
                       android:textAllCaps="false" />
 
                   <TextView
@@ -289,7 +387,7 @@ jobs:
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
                       android:layout_marginTop="20dp"
-                      android:text="প্রস্তুত"
+                      android:text="Ready"
                       android:textColor="#80CBC4"
                       android:textSize="13sp" />
               </LinearLayout>
@@ -300,9 +398,10 @@ jobs:
           cat > "$APP/src/main/res/layout/widget_photo.xml" << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:id="@+id/widgetRoot"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
-              android:background="#1E1E1E">
+              android:background="@drawable/widget_bg">
 
               <ImageView
                   android:id="@+id/widgetImage"
@@ -316,18 +415,28 @@ jobs:
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
                   android:layout_gravity="center"
-                  android:text="ছবি যোগ করুন"
+                  android:text="Add Photos"
                   android:textColor="#888888"
                   android:textSize="14sp" />
           </FrameLayout>
+          EOF
+
+          # ========== drawable/widget_bg.xml ==========
+          cat > "$APP/src/main/res/drawable/widget_bg.xml" << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <solid android:color="#1E1E1E" />
+              <corners android:radius="16dp" />
+              <stroke android:width="2dp" android:color="#4DB6AC" />
+          </shape>
           EOF
 
           # ========== values/strings.xml ==========
           cat > "$APP/src/main/res/values/strings.xml" << 'EOF'
           <resources>
               <string name="app_name">PhotoFlow Wallpaper</string>
-              <string name="wallpaper_desc">ফটো ফ্লো লাইভ ওয়ালপেপার</string>
-              <string name="wallpaper_video_desc">ভিডিও লাইভ ওয়ালপেপার</string>
+              <string name="wallpaper_desc">Photo Flow Live Wallpaper</string>
+              <string name="wallpaper_video_desc">Video Live Wallpaper</string>
           </resources>
           EOF
 
@@ -380,11 +489,18 @@ jobs:
 
           import android.app.Activity
           import android.app.WallpaperManager
+          import android.appwidget.AppWidgetManager
           import android.content.ComponentName
           import android.content.Intent
           import android.net.Uri
+          import android.os.Build
           import android.os.Bundle
-          import android.widget.Button
+          import android.view.View
+          import android.widget.AdapterView
+          import android.widget.ArrayAdapter
+          import android.widget.EditText
+          import android.widget.LinearLayout
+          import android.widget.Spinner
           import android.widget.TextView
           import android.widget.Toast
           import androidx.activity.result.contract.ActivityResultContracts
@@ -394,7 +510,25 @@ jobs:
           class MainActivity : AppCompatActivity() {
 
               private lateinit var tvStatus: TextView
-              private var pendingAction: String? = null
+              private lateinit var spinnerInterval: Spinner
+              private lateinit var spinnerScaling: Spinner
+              private lateinit var customTimeLayout: LinearLayout
+              private lateinit var etHours: EditText
+              private lateinit var etMinutes: EditText
+              private lateinit var etSeconds: EditText
+
+              private val intervals = listOf(
+                  "5 sec", "10 sec", "15 sec", "30 sec", "45 sec",
+                  "1 min", "2 min", "3 min", "5 min", "10 min",
+                  "15 min", "30 min", "1 hour", "Custom"
+              )
+              private val intervalValues = listOf(
+                  5000L, 10000L, 15000L, 30000L, 45000L,
+                  60000L, 120000L, 180000L, 300000L, 600000L,
+                  900000L, 1800000L, 3600000L, -1L
+              )
+              private val scalingModes = listOf("Center Crop", "Fit Center", "Fill / Stretch")
+              private val scalingValues = listOf("centerCrop", "fitCenter", "fitXY")
 
               private val pickPhotos = registerForActivityResult(
                   ActivityResultContracts.OpenMultipleDocuments()
@@ -408,8 +542,9 @@ jobs:
                       val existing = prefs.getStringSet("photo_uris", emptySet()) ?: emptySet()
                       val merged = existing + uris.map { it.toString() }
                       prefs.edit().putStringSet("photo_uris", merged).apply()
-                      tvStatus.text = "নির্বাচিত ছবি: ${merged.size}"
-                      Toast.makeText(this, "${uris.size} টি ছবি যোগ হয়েছে", Toast.LENGTH_SHORT).show()
+                      tvStatus.text = "Selected photos: ${merged.size}"
+                      Toast.makeText(this, "${uris.size} photos added", Toast.LENGTH_SHORT).show()
+                      triggerWidgetUpdate()
                   }
               }
 
@@ -420,7 +555,7 @@ jobs:
                       contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                       val prefs = getSharedPreferences("photoflow", MODE_PRIVATE)
                       prefs.edit().putString("video_uri", it.toString()).apply()
-                      tvStatus.text = "ভিডিও নির্বাচিত হয়েছে"
+                      tvStatus.text = "Video selected"
                   }
               }
 
@@ -428,6 +563,19 @@ jobs:
                   super.onCreate(savedInstanceState)
                   setContentView(R.layout.activity_main)
                   tvStatus = findViewById(R.id.tvStatus)
+                  spinnerInterval = findViewById(R.id.spinnerInterval)
+                  spinnerScaling = findViewById(R.id.spinnerScaling)
+                  customTimeLayout = findViewById(R.id.customTimeLayout)
+                  etHours = findViewById(R.id.etHours)
+                  etMinutes = findViewById(R.id.etMinutes)
+                  etSeconds = findViewById(R.id.etSeconds)
+
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                      requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 101)
+                  }
+
+                  setupSpinners()
+                  loadSavedSettings()
 
                   findViewById<MaterialButton>(R.id.btnPickPhotos).setOnClickListener {
                       pickPhotos.launch(arrayOf("image/*"))
@@ -437,27 +585,107 @@ jobs:
                       pickVideo.launch(arrayOf("video/*"))
                   }
 
+                  findViewById<MaterialButton>(R.id.btnSaveTimer).setOnClickListener {
+                      saveTimerSettings()
+                  }
+
                   findViewById<MaterialButton>(R.id.btnSetPhotoWallpaper).setOnClickListener {
-                      val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)
-                      intent.putExtra(
-                          WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
-                          ComponentName(this, PhotoLiveWallpaperService::class.java)
-                      )
-                      startActivity(intent)
+                      setLiveWallpaper(PhotoLiveWallpaperService::class.java)
                   }
 
                   findViewById<MaterialButton>(R.id.btnSetVideoWallpaper).setOnClickListener {
-                      val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)
-                      intent.putExtra(
-                          WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
-                          ComponentName(this, VideoLiveWallpaperService::class.java)
-                      )
-                      startActivity(intent)
+                      setLiveWallpaper(VideoLiveWallpaperService::class.java)
+                  }
+              }
+
+              private fun setupSpinners() {
+                  val intervalAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, intervals)
+                  spinnerInterval.adapter = intervalAdapter
+                  spinnerInterval.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                      override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                          customTimeLayout.visibility = if (intervals[position] == "Custom") View.VISIBLE else View.GONE
+                      }
+                      override fun onNothingSelected(parent: AdapterView<*>?) {}
+                  }
+
+                  val scalingAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, scalingModes)
+                  spinnerScaling.adapter = scalingAdapter
+                  spinnerScaling.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                      override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                          val prefs = getSharedPreferences("photoflow", MODE_PRIVATE)
+                          prefs.edit().putString("image_scaling", scalingValues[position]).apply()
+                          triggerWidgetUpdate()
+                      }
+                      override fun onNothingSelected(parent: AdapterView<*>?) {}
+                  }
+              }
+
+              private fun loadSavedSettings() {
+                  val prefs = getSharedPreferences("photoflow", MODE_PRIVATE)
+                  val savedInterval = prefs.getLong("widget_interval", 30000L)
+                  val savedScaling = prefs.getString("image_scaling", "centerCrop")
+
+                  val intervalIdx = intervalValues.indexOf(savedInterval)
+                  if (intervalIdx >= 0) {
+                      spinnerInterval.setSelection(intervalIdx)
+                  } else {
+                      spinnerInterval.setSelection(intervals.size - 1) // Custom
+                      val hrs = savedInterval / 3600000
+                      val mins = (savedInterval % 3600000) / 60000
+                      val secs = (savedInterval % 60000) / 1000
+                      if (hrs > 0) etHours.setText(hrs.toString())
+                      if (mins > 0) etMinutes.setText(mins.toString())
+                      if (secs > 0) etSeconds.setText(secs.toString())
+                  }
+
+                  val scalingIdx = scalingValues.indexOf(savedScaling)
+                  if (scalingIdx >= 0) spinnerScaling.setSelection(scalingIdx)
+
+                  val count = prefs.getStringSet("photo_uris", emptySet())?.size ?: 0
+                  tvStatus.text = "Saved photos: $count"
+              }
+
+              private fun saveTimerSettings() {
+                  val selectedPos = spinnerInterval.selectedItemPosition
+                  var finalInterval = intervalValues[selectedPos]
+
+                  if (finalInterval == -1L) {
+                      val hrs = etHours.text.toString().toLongOrNull() ?: 0L
+                      val mins = etMinutes.text.toString().toLongOrNull() ?: 0L
+                      val secs = etSeconds.text.toString().toLongOrNull() ?: 0L
+                      finalInterval = (hrs * 3600000) + (mins * 60000) + (secs * 1000)
+                  }
+
+                  if (finalInterval <= 0L) {
+                      Toast.makeText(this, "Invalid interval. Must be greater than 0.", Toast.LENGTH_SHORT).show()
+                      return
                   }
 
                   val prefs = getSharedPreferences("photoflow", MODE_PRIVATE)
-                  val count = prefs.getStringSet("photo_uris", emptySet())?.size ?: 0
-                  tvStatus.text = "সংরক্ষিত ছবি: $count"
+                  prefs.edit().putLong("widget_interval", finalInterval).apply()
+                  
+                  Toast.makeText(this, "Timer saved: ${finalInterval / 1000} seconds", Toast.LENGTH_SHORT).show()
+                  triggerWidgetUpdate()
+              }
+
+              private fun triggerWidgetUpdate() {
+                  val intent = Intent(this, PhotoWidgetProvider::class.java).apply {
+                      action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                  }
+                  val ids = AppWidgetManager.getInstance(this).getAppWidgetIds(
+                      ComponentName(this, PhotoWidgetProvider::class.java)
+                  )
+                  intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+                  sendBroadcast(intent)
+              }
+
+              private fun setLiveWallpaper(serviceClass: Class<*>) {
+                  val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)
+                  intent.putExtra(
+                      WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                      ComponentName(this, serviceClass)
+                  )
+                  startActivity(intent)
               }
           }
           EOF
@@ -466,49 +694,147 @@ jobs:
           cat > "$APP/src/main/java/com/photoflow/wallpaper/PhotoWidgetProvider.kt" << 'EOF'
           package com.photoflow.wallpaper
 
+          import android.app.AlarmManager
+          import android.app.PendingIntent
           import android.appwidget.AppWidgetManager
           import android.appwidget.AppWidgetProvider
+          import android.content.ComponentName
           import android.content.Context
+          import android.content.Intent
           import android.graphics.Bitmap
           import android.graphics.BitmapFactory
           import android.net.Uri
+          import android.os.Build
+          import android.os.Bundle
           import android.widget.RemoteViews
           import java.io.InputStream
 
           class PhotoWidgetProvider : AppWidgetProvider() {
+
+              companion object {
+                  const val ACTION_NEXT_IMAGE = "com.photoflow.wallpaper.ACTION_NEXT_IMAGE"
+                  const val ALARM_REQUEST_CODE = 1001
+              }
 
               override fun onUpdate(
                   context: Context,
                   appWidgetManager: AppWidgetManager,
                   appWidgetIds: IntArray
               ) {
-                  val prefs = context.getSharedPreferences("photoflow", Context.MODE_PRIVATE)
-                  val uris = prefs.getStringSet("photo_uris", emptySet())?.toList() ?: emptyList()
-
                   for (appWidgetId in appWidgetIds) {
-                      val views = RemoteViews(context.packageName, R.layout.widget_photo)
-                      if (uris.isNotEmpty()) {
-                          val index = prefs.getInt("widget_index_$appWidgetId", 0) % uris.size
-                          val uri = Uri.parse(uris[index])
-                          try {
-                              val input: InputStream? = context.contentResolver.openInputStream(uri)
-                              val bitmap = BitmapFactory.decodeStream(input)
-                              input?.close()
-                              if (bitmap != null) {
-                                  views.setImageViewBitmap(R.id.widgetImage, bitmap)
-                                  views.setViewVisibility(R.id.widgetEmpty, android.view.View.GONE)
-                              } else {
-                                  views.setViewVisibility(R.id.widgetEmpty, android.view.View.VISIBLE)
-                              }
-                          } catch (e: Exception) {
+                      updateWidget(context, appWidgetManager, appWidgetId, false)
+                  }
+                  scheduleAlarm(context)
+              }
+
+              override fun onReceive(context: Context, intent: Intent) {
+                  super.onReceive(context, intent)
+                  if (intent.action == ACTION_NEXT_IMAGE) {
+                      val appWidgetManager = AppWidgetManager.getInstance(context)
+                      val ids = appWidgetManager.getAppWidgetIds(
+                          ComponentName(context, PhotoWidgetProvider::class.java)
+                      )
+                      for (id in ids) {
+                          updateWidget(context, appWidgetManager, id, true)
+                      }
+                      scheduleAlarm(context)
+                  }
+              }
+
+              override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+                  super.onDeleted(context, appWidgetIds)
+                  val prefs = context.getSharedPreferences("photoflow", MODE_PRIVATE)
+                  val editor = prefs.edit()
+                  for (id in appWidgetIds) {
+                      editor.remove("widget_index_$id")
+                  }
+                  editor.apply()
+              }
+
+              override fun onDisabled(context: Context) {
+                  super.onDisabled(context)
+                  val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                  val intent = Intent(context, PhotoWidgetProvider::class.java).apply {
+                      action = ACTION_NEXT_IMAGE
+                  }
+                  val pendingIntent = PendingIntent.getBroadcast(
+                      context, ALARM_REQUEST_CODE, intent,
+                      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                  )
+                  alarmManager.cancel(pendingIntent)
+              }
+
+              private fun updateWidget(
+                  context: Context,
+                  appWidgetManager: AppWidgetManager,
+                  appWidgetId: Int,
+                  advanceImage: Boolean
+              ) {
+                  val prefs = context.getSharedPreferences("photoflow", MODE_PRIVATE)
+                  val uris = prefs.getStringSet("photo_uris", emptySet())?.toList() ?: emptyList()
+                  val scaling = prefs.getString("image_scaling", "centerCrop") ?: "centerCrop"
+
+                  val views = RemoteViews(context.packageName, R.layout.widget_photo)
+                  
+                  val scaleType = when (scaling) {
+                      "fitCenter" -> android.widget.ImageView.ScaleType.FIT_CENTER
+                      "fitXY" -> android.widget.ImageView.ScaleType.FIT_XY
+                      else -> android.widget.ImageView.ScaleType.CENTER_CROP
+                  }
+                  views.setInt(R.id.widgetImage, "setScaleType", scaleType.ordinal)
+
+                  if (uris.isNotEmpty()) {
+                      var index = prefs.getInt("widget_index_$appWidgetId", 0)
+                      if (advanceImage) index = (index + 1) % uris.size
+                      
+                      val uri = Uri.parse(uris[index])
+                      try {
+                          val input: InputStream? = context.contentResolver.openInputStream(uri)
+                          val bitmap = BitmapFactory.decodeStream(input)
+                          input?.close()
+                          if (bitmap != null) {
+                              views.setImageViewBitmap(R.id.widgetImage, bitmap)
+                              views.setViewVisibility(R.id.widgetEmpty, android.view.View.GONE)
+                              prefs.edit().putInt("widget_index_$appWidgetId", index).apply()
+                          } else {
                               views.setViewVisibility(R.id.widgetEmpty, android.view.View.VISIBLE)
                           }
-                          prefs.edit().putInt("widget_index_$appWidgetId", index + 1).apply()
-                      } else {
+                      } catch (e: Exception) {
                           views.setViewVisibility(R.id.widgetEmpty, android.view.View.VISIBLE)
-                          views.setViewVisibility(R.id.widgetImage, android.view.View.GONE)
                       }
-                      appWidgetManager.updateAppWidget(appWidgetId, views)
+                  } else {
+                      views.setViewVisibility(R.id.widgetEmpty, android.view.View.VISIBLE)
+                      views.setViewVisibility(R.id.widgetImage, android.view.View.GONE)
+                  }
+                  appWidgetManager.updateAppWidget(appWidgetId, views)
+              }
+
+              private fun scheduleAlarm(context: Context) {
+                  val prefs = context.getSharedPreferences("photoflow", MODE_PRIVATE)
+                  val interval = prefs.getLong("widget_interval", 30000L)
+                  
+                  // Minimum realistic interval for alarms is often 15s-30s to prevent abuse/battery drain
+                  val safeInterval = if (interval < 15000L) 15000L else interval
+
+                  val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                  val intent = Intent(context, PhotoWidgetProvider::class.java).apply {
+                      action = ACTION_NEXT_IMAGE
+                  }
+                  val pendingIntent = PendingIntent.getBroadcast(
+                      context, ALARM_REQUEST_CODE, intent,
+                      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                  )
+
+                  val triggerTime = System.currentTimeMillis() + safeInterval
+
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                      if (alarmManager.canScheduleExactAlarms()) {
+                          alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                      } else {
+                          alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                      }
+                  } else {
+                      alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
                   }
               }
           }
@@ -545,7 +871,8 @@ jobs:
                       override fun run() {
                           if (!visible) return
                           loadNext()
-                          handler.postDelayed(this, 30_000L)
+                          val interval = getSharedPreferences("photoflow", MODE_PRIVATE).getLong("widget_interval", 30000L)
+                          handler.postDelayed(this, interval)
                       }
                   }
 
@@ -553,7 +880,8 @@ jobs:
                       this.visible = visible
                       if (visible) {
                           loadNext()
-                          handler.postDelayed(runnable, 30_000L)
+                          val interval = getSharedPreferences("photoflow", MODE_PRIVATE).getLong("widget_interval", 30000L)
+                          handler.postDelayed(runnable, interval)
                       } else {
                           handler.removeCallbacks(runnable)
                       }
@@ -577,9 +905,7 @@ jobs:
                       val uri = Uri.parse(uris[currentIndex])
                       try {
                           val input = contentResolver.openInputStream(uri)
-                          val options = BitmapFactory.Options().apply {
-                              inJustDecodeBounds = true
-                          }
+                          val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                           BitmapFactory.decodeStream(input, null, options)
                           input?.close()
                           options.inSampleSize = calculateSampleSize(options)
@@ -638,8 +964,6 @@ jobs:
           package com.photoflow.wallpaper
 
           import android.net.Uri
-          import android.os.Handler
-          import android.os.Looper
           import android.service.wallpaper.WallpaperService
           import android.view.SurfaceHolder
           import androidx.media3.common.MediaItem
@@ -652,8 +976,6 @@ jobs:
 
               inner class VideoEngine : Engine() {
                   private var player: ExoPlayer? = null
-                  private var visible = false
-                  private val handler = Handler(Looper.getMainLooper())
 
                   override fun onSurfaceCreated(holder: SurfaceHolder) {
                       super.onSurfaceCreated(holder)
@@ -671,7 +993,6 @@ jobs:
                   }
 
                   override fun onVisibilityChanged(visible: Boolean) {
-                      this.visible = visible
                       if (visible) {
                           player?.playWhenReady = true
                       } else {
@@ -688,21 +1009,8 @@ jobs:
           }
           EOF
 
-          # ========== README.md ==========
-          cat > "$ROOT/README.md" << 'EOF'
-          # PhotoFlow Wallpaper
-
-          একক GitHub Actions ওয়ার্কফ্লো থেকে জেনারেট এবং বিল্ড করা Android অ্যাপ্লিকেশন।
-
-          ## সীমাবদ্ধতা
-          - AppWidget updatePeriodMillis-এর সর্বনিম্ন মান Android দ্বারা সীমাবদ্ধ (সাধারণত ৩০ মিনিট), তাই ১০ সেকেন্ডের নির্ভুল রিফ্রেশ গ্যারান্টি নেই।
-          - RemoteViews-এ জটিল অ্যানিমেশন (Blur, Zoom) সমর্থিত নয়; Fade/Crossfade-এর মতো মৌলিক পরিবর্তন সম্ভব।
-          - Live Wallpaper-এ সাউন্ড সব ডিভাইসে এবং সব launcher-এ কাজ নাও করতে পারে।
-          - ভিডিও লাইভ ওয়ালপেপার ExoPlayer ব্যবহার করে; ডিভাইস কোডেক সমর্থন সাপেক্ষে চলে।
-          EOF
-
           echo "=== All project files generated ==="
-          find "$ROOT" -name "*.kts" -o -name "*.kt" -o -name "*.xml" | head -30
+          find "$ROOT" -name "*.kts" -o -name "*.kt" -o -name "*.xml" | head -40
 
       - name: Bootstrap Gradle Wrapper
         run: |
